@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>8ビット 2進法そろばん</title>
+    <style>
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #f3f4f6; margin: 0; padding: 20px; }
+        .display-board { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; text-align: center; width: 100%; max-width: 600px; }
+        .display-board h1 { margin: 0 0 10px 0; font-size: 1.5rem; color: #374151; }
+        .value { font-size: 2rem; font-weight: bold; color: #2563eb; font-family: monospace; letter-spacing: 2px; }
+        .abacus { display: flex; gap: 15px; background: #e5e7eb; padding: 20px; border-radius: 10px; border: 4px solid #9ca3af; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1); }
+        .column { display: flex; flex-direction: column; align-items: center; width: 50px; }
+        .weight { margin-bottom: 10px; font-weight: bold; color: #4b5563; }
+        .rod { width: 6px; height: 120px; background: #d1d5db; border-radius: 3px; position: relative; display: flex; justify-content: center; border: 1px solid #9ca3af; }
+        .bead { width: 40px; height: 40px; border-radius: 50%; background: #ef4444; position: absolute; bottom: 0; cursor: pointer; transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s; box-shadow: 0 4px 6px rgba(0,0,0,0.3), inset -2px -2px 6px rgba(0,0,0,0.2); }
+        .bead:hover { transform: scale(1.05); }
+        .bead.active { bottom: 80px; background: #3b82f6; }
+        .bit-label { margin-top: 10px; font-family: monospace; font-size: 1.2rem; font-weight: bold; color: #374151; }
+        button { margin-top: 20px; padding: 12px 24px; font-size: 1rem; font-weight: bold; color: white; background: #10b981; border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: background 0.2s, transform 0.1s; }
+        button:hover { background: #059669; }
+        button:active { transform: translateY(2px); }
+    </style>
+</head>
+<body>
+    <div class="display-board">
+        <h1>現在の値</h1>
+        <div>10進数: <span id="decimal-display" class="value">0</span></div>
+        <div>2進数: <span id="binary-display" class="value">00000000</span></div>
+    </div>
+
+    <div class="abacus" id="abacus-container">
+        <!-- 桁はJavaScriptで動的に生成されます -->
+    </div>
+
+    <button onclick="resetAbacus()">すべて0にリセット</button>
+
+    <script>
+        // 桁の重み（左から右：128〜1）
+        const weights = [128, 64, 32, 16, 8, 4, 2, 1];
+        // 珠の現在の状態（0:下, 1:上）
+        let state = [0, 0, 0, 0, 0, 0, 0, 0];
+        
+        const container = document.getElementById('abacus-container');
+        const decimalDisplay = document.getElementById('decimal-display');
+        const binaryDisplay = document.getElementById('binary-display');
+
+        // そろばんUIの構築
+        function renderAbacus() {
+            container.innerHTML = '';
+            weights.forEach((weight, index) => {
+                const col = document.createElement('div');
+                col.className = 'column';
+                col.innerHTML = `
+                    <div class="weight">${weight}</div>
+                    <div class="rod">
+                        <div class="bead ${state[index] ? 'active' : ''}" id="bead-${index}" onclick="handleBeadClick(${index})"></div>
+                    </div>
+                    <div class="bit-label" id="bit-${index}">${state[index]}</div>
+                `;
+                container.appendChild(col);
+            });
+            updateDisplay();
+        }
+
+        // 珠をクリックしたときの処理
+        function handleBeadClick(index) {
+            if (state[index] === 0) {
+                state[index] = 1;
+                updateVisuals(index);
+            } else {
+                state[index] = 0;
+                updateVisuals(index);
+                
+                // 繰り上がり（リップルキャリー）処理：300ms後に1つ上の桁へ
+                if (index > 0) {
+                    setTimeout(() => {
+                        triggerCarry(index - 1);
+                    }, 300);
+                }
+            }
+            updateDisplay();
+        }
+
+        // 繰り上がりの連鎖処理
+        function triggerCarry(index) {
+            if (state[index] === 0) {
+                state[index] = 1;
+                updateVisuals(index);
+            } else {
+                state[index] = 0;
+                updateVisuals(index);
+                // さらに上の桁がある場合は連鎖
+                if (index > 0) {
+                    setTimeout(() => {
+                        triggerCarry(index - 1);
+                    }, 300);
+                }
+            }
+            updateDisplay();
+        }
+
+        // 見た目（珠の位置とビット表示）の更新
+        function updateVisuals(index) {
+            const bead = document.getElementById(`bead-${index}`);
+            const bitLabel = document.getElementById(`bit-${index}`);
+            if (state[index]) {
+                bead.classList.add('active');
+                bitLabel.textContent = '1';
+            } else {
+                bead.classList.remove('active');
+                bitLabel.textContent = '0';
+            }
+        }
+
+        // 10進数と2進数のテキスト更新
+        function updateDisplay() {
+            let decimal = 0;
+            let binaryStr = '';
+            for (let i = 0; i < 8; i++) {
+                if (state[i] === 1) decimal += weights[i];
+                binaryStr += state[i];
+            }
+            decimalDisplay.textContent = decimal;
+            binaryDisplay.textContent = binaryStr;
+        }
+
+        // リセット機能
+        function resetAbacus() {
+            state = [0, 0, 0, 0, 0, 0, 0, 0];
+            for (let i = 0; i < 8; i++) {
+                updateVisuals(i);
+            }
+            updateDisplay();
+        }
+
+        // 初回読み込み時の描画
+        renderAbacus();
+    </script>
+</body>
+</html>
